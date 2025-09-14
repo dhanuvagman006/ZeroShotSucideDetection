@@ -1,0 +1,19 @@
+[project]
+name = "zeroshoot-suicide-detection-web"
+version = "0.1.0"
+description = "Simple web interface to upload images and run Gemini-based detection with visualization"
+authors = [ { name = "Your Name" } ]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "flask",
+  "pillow",
+  "google-genai",
+  "supervision",
+]
+
+[project.optional-dependencies]
+dev = ["python-dotenv"]
+
+[tool.uv]
+# If using uv as package manager.

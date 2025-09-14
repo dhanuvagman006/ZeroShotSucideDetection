@@ -1,0 +1,38 @@
+{% extends 'layout.html' %}
+{% block content %}
+<section class="upload">
+  <h2>Upload Images</h2>
+  <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+    <input type="file" name="images" multiple accept="image/*" required>
+    <label><input type="checkbox" name="run_detection" checked> Run detection</label>
+    <input type="text" name="prompt" placeholder="Custom prompt (optional)" style="width:300px" />
+    <button type="submit">Upload</button>
+  </form>
+</section>
+<section class="gallery">
+  <h2>Gallery</h2>
+  {% if images %}
+  <div class="grid">
+    {% for img in images %}
+      <div class="card">
+        <div class="pair">
+          <figure>
+            <img src="{{ url_for('uploaded_file', filename=img.original) }}" alt="{{ img.original }}" />
+            <figcaption>Original</figcaption>
+          </figure>
+          {% if img.annotated %}
+          <figure>
+            <img src="{{ url_for('annotated_file', filename=img.annotated) }}" alt="{{ img.annotated }}" />
+            <figcaption>Annotated</figcaption>
+          </figure>
+          {% endif %}
+        </div>
+        <div class="filename">{{ img.original }}</div>
+      </div>
+    {% endfor %}
+  </div>
+  {% else %}
+    <p>No images yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

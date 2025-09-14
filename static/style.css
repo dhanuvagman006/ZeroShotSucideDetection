@@ -1,0 +1,17 @@
+body {font-family: system-ui, Arial, sans-serif; margin:0; padding:0; background:#f5f7fa; color:#222;}
+header {background:#1e293b; color:#fff; padding:0.75rem 1.25rem;}
+header a {color:#fff; text-decoration:none;}
+main {padding:1rem clamp(1rem, 4vw, 2.5rem);}
+.upload form {display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; background:#fff; padding:0.75rem 1rem; border:1px solid #cbd5e1; border-radius:8px;}
+button {background:#2563eb; color:#fff; border:none; padding:0.5rem 1rem; border-radius:4px; cursor:pointer;}
+button:hover {background:#1d4ed8;}
+.flashes {list-style:none; padding:0.5rem 0.75rem; margin:0 0 1rem; background:#fff7d6; border:1px solid #facc15; border-radius:6px;}
+.gallery .grid {display:grid; gap:1rem; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); margin-top:1rem;}
+.card {background:#fff; border:1px solid #dbe1e8; border-radius:10px; padding:0.75rem; box-shadow:0 1px 2px rgba(0,0,0,0.05);}
+.card img {max-width:100%; height:auto; display:block; border-radius:4px;}
+.pair {display:grid; gap:0.5rem;}
+.pair figure {margin:0;}
+figure figcaption {font-size:0.75rem; text-align:center; color:#555; margin-top:0.25rem;}
+.filename {margin-top:0.5rem; font-size:0.8rem; color:#334155; word-break:break-all;}
+.small {font-size:0.7rem; text-align:center; padding:1.5rem 0; color:#64748b;}
+@media (min-width: 680px) { .pair {grid-template-columns: 1fr 1fr;} }
