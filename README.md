@@ -2,9 +2,6 @@
 
 > Lightweight Flask application for real-time frame risk assessment + optional object/region detection using Google Gemini (Generative AI) with WebSocket camera streaming and an image gallery.
 
-⚠️ **Important Disclaimer**
-This project is a **technical demo**. It is **NOT** a medical, psychological, or emergency tool and must **not** be relied upon for any clinical or life-critical decision. If you or someone else is in immediate danger, contact your local emergency services or a suicide prevention hotline.
-
 ---
 
 ## ✨ Features
