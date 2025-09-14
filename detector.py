@@ -30,6 +30,14 @@ PROMPT_SUFFIX = (
     ' and the text label in the key "label". Use descriptive labels.'
 )
 
+# Risk assessment prompt template (neutral wording, JSON contract enforced)
+RISK_PROMPT = (
+    "You are a safety pattern screening assistant. Given an image, you will output a JSON object ONLY. "
+    "The JSON must have keys: score (float 0-1), indicators (array of short lowercase strings). "
+    "score expresses confidence that the image contains concerning self-harm related visual patterns or tools. "
+    "If no concerning patterns: score=0 and indicators=[]. Do not add explanations or extra keys."
+)
+
 
 def _get_client() -> genai.Client:
     api_key = os.getenv('GOOGLE_API_KEY')
@@ -156,6 +164,45 @@ def detect_boxes(image_bytes: bytes, prompt: Optional[str] = None):
         out.append({"box_2d": [x1, y1, x2, y2], "label": label})
     print(f"[detect_boxes] parsed boxes: {len(out)}")
     return out, image.size
+
+
+def assess_risk(image_bytes: bytes) -> dict:
+    """Assess potential safety / self-harm related visual risk in the image.
+
+    Returns dict { 'score': float 0..1, 'indicators': [str], 'raw': optional_raw_text }
+    Fails soft (returns score 0) if model unavailable or JSON parse fails.
+    """
+    from io import BytesIO
+    image = Image.open(BytesIO(image_bytes)).convert('RGB')
+    width, height = image.size
+    target_height = int(512 * height / width)
+    resized_image = image.resize((512, target_height), Image.Resampling.LANCZOS)
+    client = _get_client()
+    try:
+        response = _generate_with_retry(
+            client,
+            model=DEFAULT_MODEL,
+            contents=[resized_image, RISK_PROMPT],
+            config=types.GenerateContentConfig(
+                temperature=0.1,
+                safety_settings=SAFETY_SETTINGS,
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
+            ),
+        )
+        txt = (response.text or '').strip()
+        import json
+        data = json.loads(txt)
+        score = float(data.get('score', 0))
+        indicators = data.get('indicators', []) or []
+        if not isinstance(indicators, list):
+            indicators = []
+        indicators = [str(x)[:40].lower() for x in indicators][:10]
+        # Clamp score
+        score = 0.0 if score < 0 else (1.0 if score > 1 else score)
+        return {'score': score, 'indicators': indicators, 'raw': txt}
+    except Exception as e:  # noqa
+        print('[assess_risk] failed:', e)
+        return {'score': 0.0, 'indicators': [], 'raw': None}
 
 
 if __name__ == '__main__':

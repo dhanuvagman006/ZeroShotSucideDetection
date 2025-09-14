@@ -1,0 +1,296 @@
+{% extends 'layout.html' %}
+{% block content %}
+<div class="scan-container">
+  <div class="scan-header">
+    <h2>🛡️ Live Suicidal Detection System</h2>
+    <p>Real-time monitoring using AI to detect concerning behavior patterns</p>
+  </div>
+  
+  <div class="scan-content">
+    <div class="video-section">
+      <div class="video-wrapper">
+        <img id="scanVideo" alt="Live feed" />
+        <div class="video-overlay">
+          <div id="autoStatus" class="status-indicator">
+            🔄 Connecting to camera feed...
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="control-panel">
+      <div class="panel-header">
+        <h3>🎛️ Control Panel</h3>
+      </div>
+      
+      <div class="controls">
+        <button id="scanStart" class="start-btn">
+          <span>▶️</span>
+          Start Monitoring
+        </button>
+        <button id="scanStop" class="stop-btn" disabled>
+          <span>⏹️</span>
+          Stop Monitoring
+        </button>
+        
+        <div class="setting-group">
+          <label for="scanThreshold">🎯 Risk Threshold</label>
+          <input type="number" id="scanThreshold" value="0.5" min="0" max="1" step="0.01" />
+          <span class="threshold-info">Higher = Less sensitive</span>
+        </div>
+      </div>
+      
+      <div class="stats-panel">
+        <div class="stat-item">
+          <span class="stat-label">Status</span>
+          <span id="statusText" class="stat-value">Initializing...</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Frames Analyzed</span>
+          <span id="frameCount" class="stat-value">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Last Check</span>
+          <span id="lastCheck" class="stat-value">-</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.scan-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: #0f0f0f;
+  min-height: calc(100vh - 120px);
+  color: #ffffff;
+}
+
+.scan-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.scan-header h2 {
+  color: #00ff88;
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  text-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+}
+
+.scan-header p {
+  color: #a0a0a0;
+  font-size: 1.1rem;
+}
+
+.scan-content {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 2rem;
+  align-items: start;
+}
+
+.video-section {
+  position: relative;
+}
+
+.video-wrapper {
+  position: relative;
+  background: #1a1a1a;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border: 2px solid #333;
+}
+
+#scanVideo {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: #000;
+  min-height: 400px;
+}
+
+.video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 1rem;
+}
+
+.status-indicator {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.status-indicator.success {
+  background: rgba(0, 255, 136, 0.2);
+  border-color: #00ff88;
+  color: #00ff88;
+}
+
+.status-indicator.error {
+  background: rgba(255, 69, 58, 0.2);
+  border-color: #ff453a;
+  color: #ff453a;
+}
+
+.status-indicator.warning {
+  background: rgba(255, 159, 10, 0.2);
+  border-color: #ff9f0a;
+  color: #ff9f0a;
+}
+
+.control-panel {
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 2px solid #333;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.panel-header h3 {
+  color: #00ff88;
+  margin-bottom: 1.5rem;
+  font-size: 1.3rem;
+}
+
+.controls {
+  margin-bottom: 2rem;
+}
+
+.stop-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #ff453a, #ff6b6b);
+  color: white;
+  border: none;
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.stop-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 69, 58, 0.3);
+}
+
+.stop-btn:disabled {
+  background: #333;
+  color: #666;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.setting-group {
+  margin-bottom: 1rem;
+}
+
+.setting-group label {
+  display: block;
+  color: #00ff88;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.setting-group input {
+  width: 100%;
+  background: #2a2a2a;
+  border: 2px solid #444;
+  border-radius: 6px;
+  padding: 0.75rem;
+  color: #fff;
+  font-size: 1rem;
+  transition: border-color 0.3s ease;
+}
+
+.setting-group input:focus {
+  outline: none;
+  border-color: #00ff88;
+  box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1);
+}
+
+.threshold-info {
+  font-size: 0.85rem;
+  color: #888;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+.stats-panel {
+  background: #0f0f0f;
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid #333;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.stat-item:last-child {
+  border-bottom: none;
+}
+
+.stat-label {
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.stat-value {
+  color: #00ff88;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+@media (max-width: 768px) {
+  .scan-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .scan-container {
+    padding: 1rem;
+  }
+  
+  .scan-header h2 {
+    font-size: 2rem;
+  }
+}
+
+/* Risk detected animations */
+@keyframes riskPulse {
+  0%, 100% { 
+    border-color: #ff453a;
+    box-shadow: 0 0 20px rgba(255, 69, 58, 0.3);
+  }
+  50% { 
+    border-color: #ff6b6b;
+    box-shadow: 0 0 40px rgba(255, 69, 58, 0.6);
+  }
+}
+
+.video-wrapper.risk-detected {
+  animation: riskPulse 1s ease-in-out infinite;
+}
+</style>
+<script src="{{ url_for('static', filename='scan.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends 'layout.html' %}
+
+{% block title %}Risk Detection Gallery{% endblock %}
+
+{% block content %}
+<div class="gallery-container">
+    <div class="gallery-header">
+        <h1>🖼️ Risk Detection Gallery</h1>
+        <p>Saved frames with detected suicidal risk and custom photo analysis</p>
+    </div>
+
+    <!-- Upload Section -->
+    <div class="upload-section">
+        <h2>📤 Upload Custom Photo</h2>
+        <div class="upload-form">
+            <input type="file" id="customImage" accept=".jpg,.jpeg,.png" class="file-input">
+            <button id="analyzeBtn" class="btn btn-primary" disabled>
+                <span class="btn-icon">🔍</span>
+                Analyze Photo
+            </button>
+            <div id="uploadStatus" class="status-message"></div>
+        </div>
+        
+        <!-- Analysis Result -->
+        <div id="analysisResult" class="analysis-result" style="display: none;">
+            <h3>Analysis Result</h3>
+            <div class="result-content">
+                <div class="result-image">
+                    <img id="analyzedImage" src="" alt="Analyzed image">
+                </div>
+                <div class="result-details">
+                    <div class="risk-score">
+                        <label>Risk Score:</label>
+                        <span id="riskScore">-</span>
+                    </div>
+                    <div class="risk-indicators">
+                        <label>Indicators:</label>
+                        <div id="riskIndicators">-</div>
+                    </div>
+                    <div class="risk-status">
+                        <span id="riskStatus" class="status-badge">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gallery Section -->
+    <div class="gallery-section">
+        <h2>🚨 Risk-Detected Frames</h2>
+        {% if risk_images %}
+            <div class="gallery-grid">
+                {% for image in risk_images %}
+                <div class="gallery-item">
+                    <div class="image-container">
+                        <img src="{{ url_for('gallery_file', filename=image.filename) }}" 
+                             alt="Risk detected frame" 
+                             class="gallery-image">
+                        <div class="image-overlay">
+                            <div class="risk-info">
+                                <div class="risk-score-badge">{{ "%.3f"|format(image.score) }}</div>
+                                {% if image.indicators %}
+                                    <div class="indicators-count">{{ image.indicators|length }} indicators</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="image-details">
+                        <div class="timestamp">{{ image.timestamp[:19] if image.timestamp != 'Unknown' else 'Unknown time' }}</div>
+                        {% if image.indicators %}
+                            <div class="indicators-list">
+                                {% for indicator in image.indicators %}
+                                    <span class="indicator-tag">{{ indicator }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-gallery">
+                <div class="empty-icon">📭</div>
+                <h3>No Risk-Detected Frames Yet</h3>
+                <p>Risk-detected frames from the monitoring system will appear here automatically.</p>
+                <p>You can also upload custom photos above for analysis.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='gallery.js') }}"></script>
+{% endblock %}

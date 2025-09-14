@@ -1,9 +1,8 @@
 import os
 from pathlib import Path
 from flask import Flask, request, redirect, url_for, render_template, send_from_directory, flash, session
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO
 import base64
-import threading
 from werkzeug.utils import secure_filename
 
 # Lazy import detection module when needed to avoid requiring API key on startup
@@ -14,10 +13,12 @@ def create_app():
     socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
     app.config['UPLOAD_FOLDER'] = str(Path('uploads'))
     app.config['ANNOTATED_FOLDER'] = str(Path('annotated'))
+    app.config['GALLERY_FOLDER'] = str(Path('gallery'))
     app.config['ALLOWED_EXTENSIONS'] = {'.jpg', '.jpeg', '.png'}
 
     Path(app.config['UPLOAD_FOLDER']).mkdir(exist_ok=True)
     Path(app.config['ANNOTATED_FOLDER']).mkdir(exist_ok=True)
+    Path(app.config['GALLERY_FOLDER']).mkdir(exist_ok=True)
 
     def allowed_file(filename: str) -> bool:
         return Path(filename).suffix.lower() in app.config['ALLOWED_EXTENSIONS']
@@ -41,17 +42,41 @@ def create_app():
     @app.route('/')
     @require_auth
     def index():
-        images = []
-        for img_path in sorted(Path(app.config['UPLOAD_FOLDER']).glob('*')):
+        """Main page - now shows the realtime suicidal detection instead of gallery."""
+        return render_template('scan.html', auth_enabled=auth_enabled(), logged_in=logged_in())
+    
+    @app.route('/gallery')
+    @require_auth
+    def gallery():
+        """Gallery page showing risk-detected frames and upload functionality."""
+        # Get risk-detected frames from gallery folder
+        risk_images = []
+        gallery_path = Path(app.config['GALLERY_FOLDER'])
+        for img_path in sorted(gallery_path.glob('*'), key=lambda x: x.stat().st_mtime, reverse=True):
             if img_path.suffix.lower() not in app.config['ALLOWED_EXTENSIONS']:
                 continue
-            annotated_name = img_path.stem + '_annotated' + img_path.suffix
-            annotated_path = Path(app.config['ANNOTATED_FOLDER']) / annotated_name
-            images.append({
-                'original': img_path.name,
-                'annotated': annotated_name if annotated_path.exists() else None
+            # Read metadata if exists
+            metadata_path = img_path.with_suffix('.json')
+            metadata = {}
+            if metadata_path.exists():
+                import json
+                try:
+                    with open(metadata_path, 'r') as f:
+                        metadata = json.load(f)
+                except:
+                    metadata = {}
+            
+            risk_images.append({
+                'filename': img_path.name,
+                'timestamp': metadata.get('timestamp', 'Unknown'),
+                'score': metadata.get('score', 0),
+                'indicators': metadata.get('indicators', [])
             })
-        return render_template('index.html', images=images, auth_enabled=auth_enabled(), logged_in=logged_in())
+        
+        return render_template('gallery.html', 
+                             risk_images=risk_images, 
+                             auth_enabled=auth_enabled(), 
+                             logged_in=logged_in())
 
     @app.route('/upload', methods=['POST'])
     @require_auth
@@ -98,6 +123,10 @@ def create_app():
     def annotated_file(filename):
         return send_from_directory(app.config['ANNOTATED_FOLDER'], filename)
 
+    @app.route('/gallery/<path:filename>')
+    def gallery_file(filename):
+        return send_from_directory(app.config['GALLERY_FOLDER'], filename)
+
     @app.route('/delete', methods=['POST'])
     @require_auth
     def delete_image():
@@ -120,17 +149,6 @@ def create_app():
         else:
             flash('Nothing deleted')
         return redirect(url_for('index'))
-
-    @app.route('/camera')
-    @require_auth
-    def camera():
-        return render_template('camera.html', auth_enabled=auth_enabled(), logged_in=logged_in())
-
-    @app.route('/realtime')
-    @require_auth
-    def realtime():
-        """Page that subscribes to external websocket video stream (sender.py)."""
-        return render_template('realtime.html', auth_enabled=auth_enabled(), logged_in=logged_in())
 
     @app.route('/api/detect_frame', methods=['POST'])
     @require_auth
@@ -160,40 +178,146 @@ def create_app():
             print('API detect_frame error (outer):', e)
             return {'error': f'api error: {e}'}, 500
 
-    # --- WebSocket state ---
-    client_busy = set()  # track sid of clients with active detection
-    lock = threading.Lock()
+    @app.route('/api/risk_frame', methods=['POST'])
+    @require_auth
+    def api_risk_frame():
+        """Return risk assessment score + indicators for a single frame.
 
-    @socketio.on('frame')
-    def on_frame(data):
-        if auth_enabled() and not logged_in():
-            emit('error', {'error': 'unauthorized'})
-            return
-        sid = request.sid
-        with lock:
-            if sid in client_busy:
-                return  # drop frame (throttle)
-            client_busy.add(sid)
-        img_b64 = data.get('image')
-        prompt = data.get('prompt')
-        header, _, encoded = img_b64.partition(',')
+        Body: { image: <dataURL or b64> }
+        """
         try:
-            raw = base64.b64decode(encoded or img_b64)
-        except Exception as e:
-            with lock: client_busy.discard(sid)
-            emit('error', {'error': 'decode failed'})
-            return
-        def worker():
-            from detector import detect_boxes
+            data = request.get_json(force=True)
+            if not data:
+                return {'error': 'no json'}, 400
+            b64 = data.get('image')
+            if not b64:
+                return {'error': 'image missing'}, 400
+            header, _, encoded = b64.partition(',')
             try:
-                boxes, size = detect_boxes(raw, prompt=prompt)
-                socketio.emit('boxes', {'boxes': boxes, 'size': size}, to=sid)
-            except Exception as e:  # noqa
-                socketio.emit('error', {'error': str(e)}, to=sid)
-            finally:
-                with lock:
-                    client_busy.discard(sid)
-        threading.Thread(target=worker, daemon=True).start()
+                raw = base64.b64decode(encoded or b64)
+            except Exception:
+                return {'error': 'invalid base64'}, 400
+            from detector import assess_risk
+            result = assess_risk(raw)
+            from datetime import datetime, timezone
+            result['timestamp'] = datetime.now(timezone.utc).isoformat()
+            return result
+        except Exception as e:  # noqa
+            return {'error': str(e)}, 500
+
+    @app.route('/api/capture_and_save', methods=['POST'])
+    @require_auth
+    def api_capture_and_save():
+        """Accept a single base64 frame, save it to uploads or gallery, run detection, return filenames.
+
+        JSON body: { image: <dataURL or raw b64>, prompt?: str, run_detection?: bool, save_to_gallery?: bool, metadata?: {} }
+        Response: { original: filename, annotated: filename|None }
+        """
+        try:
+            data = request.get_json(force=True)
+            if not data:
+                return {'error': 'no json'}, 400
+            b64 = data.get('image')
+            prompt = data.get('prompt') or 'Detect objects.'
+            run_det = bool(data.get('run_detection', True))
+            save_to_gallery = bool(data.get('save_to_gallery', False))
+            metadata = data.get('metadata', {})
+            
+            if not b64:
+                return {'error': 'image missing'}, 400
+            header, _, encoded = b64.partition(',')
+            try:
+                raw = base64.b64decode(encoded or b64)
+            except Exception:
+                return {'error': 'invalid base64'}, 400
+            
+            # Choose a filename (timestamp based to avoid collisions)
+            import time
+            fname = f"frame_{int(time.time()*1000)}.jpg"
+            
+            # Save to gallery or uploads based on flag
+            if save_to_gallery:
+                save_path = Path(app.config['GALLERY_FOLDER']) / fname
+                # Also save metadata
+                metadata_path = save_path.with_suffix('.json')
+                import json
+                with open(metadata_path, 'w') as f:
+                    json.dump(metadata, f, indent=2)
+            else:
+                save_path = Path(app.config['UPLOAD_FOLDER']) / fname
+            
+            with open(save_path, 'wb') as f:
+                f.write(raw)
+            
+            annotated_name = None
+            if run_det:
+                try:
+                    from detector import run_detection as do_detect
+                    out_path = do_detect(str(save_path), app.config['ANNOTATED_FOLDER'], prompt=prompt)
+                    annotated_name = Path(out_path).name
+                except Exception as e:  # don't fail whole request
+                    print('capture_and_save detection error:', e)
+            return {'original': fname, 'annotated': annotated_name}
+        except Exception as e:
+            return {'error': str(e)}, 500
+
+    @app.route('/api/upload_and_analyze', methods=['POST'])
+    @require_auth
+    def api_upload_and_analyze():
+        """Upload a custom photo and analyze it for risk assessment."""
+        try:
+            if 'image' not in request.files:
+                return {'error': 'No image file provided'}, 400
+                
+            file = request.files['image']
+            if file.filename == '':
+                return {'error': 'No file selected'}, 400
+                
+            if not allowed_file(file.filename):
+                return {'error': 'Invalid file type'}, 400
+            
+            # Save the uploaded file
+            import time
+            filename = secure_filename(file.filename)
+            base_name = Path(filename).stem
+            ext = Path(filename).suffix
+            timestamped_name = f"{base_name}_{int(time.time()*1000)}{ext}"
+            
+            upload_path = Path(app.config['UPLOAD_FOLDER']) / timestamped_name
+            file.save(upload_path)
+            
+            # Analyze for risk
+            with open(upload_path, 'rb') as f:
+                image_data = f.read()
+            
+            from detector import assess_risk
+            result = assess_risk(image_data)
+            
+            # If risk detected, save to gallery
+            if result.get('score', 0) >= 0.5 or result.get('indicators', []):
+                gallery_path = Path(app.config['GALLERY_FOLDER']) / timestamped_name
+                import shutil
+                shutil.copy2(upload_path, gallery_path)
+                
+                # Save metadata
+                import json
+                from datetime import datetime, timezone
+                metadata = {
+                    'timestamp': datetime.now(timezone.utc).isoformat(),
+                    'score': result.get('score', 0),
+                    'indicators': result.get('indicators', []),
+                    'source': 'upload'
+                }
+                metadata_path = gallery_path.with_suffix('.json')
+                with open(metadata_path, 'w') as f:
+                    json.dump(metadata, f, indent=2)
+            
+            result['filename'] = timestamped_name
+            return result
+            
+        except Exception as e:
+            return {'error': str(e)}, 500
+
     @app.route('/login', methods=['GET','POST'])
     def login():
         if not auth_enabled():

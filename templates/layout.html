@@ -8,11 +8,10 @@
 </head>
 <body>
   <header>
-    <h1><a href="{{ url_for('index') }}">Detection Demo</a></h1>
+    <h1><a href="{{ url_for('index') }}">Live Suicidal Detection</a></h1>
     <nav>
-      <a href="{{ url_for('index') }}">Gallery</a>
-      <a href="{{ url_for('camera') }}">Camera</a>
-      <a href="{{ url_for('realtime') }}">Realtime</a>
+      <a href="{{ url_for('index') }}">Live Detection</a>
+      <a href="{{ url_for('gallery') }}">Gallery</a>
       {% if auth_enabled and logged_in %}
         <a href="{{ url_for('logout') }}">Logout</a>
       {% elif auth_enabled %}
