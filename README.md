@@ -89,179 +89,248 @@ uv sync
 $env:GOOGLE_API_KEY="YOUR_API_KEY_HERE"
 
 ## 🔧 Technical Details```
+# Zero‑Shot Suicidal Risk Detection (Web App)
 
+> Lightweight Flask application for real‑time frame risk assessment + optional object / region detection using Google Gemini (Generative AI) with WebSocket camera streaming and an image gallery.
 
+⚠️ **Important Disclaimer**
+This project is a **technical demo**. It is **NOT** a medical, psychological, or emergency tool and must **not** be relied upon for any clinical or life‑critical decision. If you or someone else is in immediate danger, contact your local emergency services or a suicide prevention hotline.
 
-### Core Components### Running
+---
 
-- **`app.py`** - Flask web application with routes and API endpoints```bash
+## ✨ Features
 
-- **`detector.py`** - Google Gemini AI integration for risk assessment# Terminal 1: Start camera WebSocket server
+- **Live Risk Monitoring** – Homepage auto connects to camera stream (or WebSocket sender) and periodically assesses frames.
+- **Object / Region Detection** – Bounding box annotation via Gemini vision + `supervision` for overlay rendering.
+- **Risk Assessment API** – Returns normalized score (0–1) + textual indicators (if present).
+- **Gallery** – Stores risk flagged frames with JSON metadata (score, indicators, timestamp).
+- **Real‑time Alerts** – Audio + visual flashing border when threshold exceeded or indicators detected.
+- **External WebSocket Camera Source** – `sender.py` publishes frames to all subscribers (multi‑tab capable).
+- **Optional Authentication** – Enable by setting `APP_USERNAME` + `APP_PASSWORD`.
+- **Dark Mode UI** – Minimal, monitoring‑friendly interface.
+- **Exponential Backoff** – Automatic retry for transient Gemini overload / 5xx responses.
 
-- **`sender.py`** - WebSocket camera server (broadcasts frames to clients)python sender.py
+---
 
-- **`scan.js`** - Frontend JavaScript for WebSocket connection and analysis
+## 🧱 Architecture Overview
 
-- **`style.css`** - Dark mode UI styling# Terminal 2: Start web application  
+| Component | Purpose |
+|-----------|---------|
+| `app.py` | Flask + Socket.IO app, routes & REST APIs |
+| `detector.py` | Gemini integration: detection, bounding boxes, risk scoring |
+| `sender.py` | Stand‑alone WebSocket frame broadcaster (camera capture) |
+| `static/scan.js` | Frontend logic for live risk & box polling / streaming |
+| `templates/` | Jinja2 HTML pages (layout, login, gallery, live scan) |
+| `uploads/` | Raw user uploads (timestamped) |
+| `annotated/` | AI annotated ( *_annotated ) images |
+| `gallery/` | Risk‑flagged frames + per‑image JSON metadata |
 
+---
+
+## 🔑 Environment Variables
+
+| Name | Required | Description | Default |
+|------|----------|-------------|---------|
+| `GOOGLE_API_KEY` | Yes | Gemini API key | — |
+| `MODEL_NAME` | No | Override model ID | `gemini-2.5-flash-preview-05-20` |
+| `APP_USERNAME` | No | Enables auth (username) | — |
+| `APP_PASSWORD` | No | Enables auth (password) | — |
+
+Auth is disabled if either credential is missing.
+
+---
+
+## 🛠 Prerequisites
+
+- Python 3.9+
+- A Google Gemini API key from: https://aistudio.google.com/app/apikey
+
+---
+
+## 🚀 Installation & Setup
+
+### 1. Clone
+```bash
+git clone <your-repo-url>
+cd ZeroShotSucideDetection
+```
+
+### 2. Install dependencies
+Using [uv](https://github.com/astral-sh/uv) (preferred):
+```bash
+uv sync
+```
+Or with pip:
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Set environment variables
+PowerShell (Windows):
+```powershell
+$env:GOOGLE_API_KEY="YOUR_KEY"
+```
+Unix shells:
+```bash
+export GOOGLE_API_KEY="YOUR_KEY"
+```
+Optional auth:
+```powershell
+$env:APP_USERNAME="admin"; $env:APP_PASSWORD="secret"
+```
+
+---
+
+## ▶️ Running (Local Development)
+
+### Option A: Built‑in camera (browser getUserMedia)
+Just start the Flask app; the live scan page will use the browser camera.
+```bash
 python app.py
+```
+Then open: http://127.0.0.1:5000/
 
-### Environment Variables```
+### Option B: External WebSocket camera publisher
+Terminal 1 (frame broadcaster):
+```bash
+python sender.py
+```
+Terminal 2 (web app):
+```bash
+python app.py
+```
+The live page subscribes to `ws://localhost:8765` and renders streamed frames.
 
-| Variable | Required | Description |
+---
 
-|----------|----------|-------------|### Access
+## 📡 Live Monitoring Flow
+1. Frame captured (browser or `sender.py`).
+2. Frontend periodically (configurable interval) sends frame (base64 JPEG) to `/api/risk_frame`.
+3. Backend (`assess_risk`) sends resized image + JSON‑contract prompt to Gemini.
+4. Response parsed: `{ score, indicators }` (score clamped 0–1).
+5. UI updates status log; if `score >= threshold` or `indicators` non‑empty ⇒ alert.
+6. (Optional) Frame can also be saved + annotated via `/api/capture_and_save` or manual upload.
 
-| `GOOGLE_API_KEY` | Yes | Gemini API key for detection |- **Live Detection**: http://127.0.0.1:5000 (auto-starts monitoring)
+Bounding box detection uses a separate call (`detect_boxes` / `/api/detect_frame`) with a prompt suffix instructing Gemini to emit JSON bounding boxes.
 
-| `MODEL_NAME` | No | Override model (default: gemini-2.5-flash-preview-05-20) |- **Gallery**: http://127.0.0.1:5000/gallery (upload & batch analysis)
+---
 
-| `APP_USERNAME` | No | Enable authentication username |
+## 📁 File & Storage Behavior
+| Directory | Purpose |
+|-----------|---------|
+| `uploads/` | Raw uploaded images (manual / API) |
+| `annotated/` | Images with drawn boxes + labels |
+| `gallery/` | Auto‑saved risk frames + `<name>.json` metadata |
+| `annotated/*.json` | (Not used currently – metadata only in `gallery/`) |
 
-| `APP_PASSWORD` | No | Enable authentication password |## Setup
+Annotated filename format: `<original_stem>_annotated<ext>`
 
-1. Create & activate a Python 3.9+ environment.
+---
 
-### API Endpoints2. Install dependencies (with uv):
+## 🔌 API Endpoints (Summary)
 
-- **`POST /api/risk_frame`** - Analyze single frame for suicidal risk```
+| Method & Path | Purpose | Body (JSON/Form) | Returns |
+|---------------|---------|------------------|---------|
+| `POST /api/risk_frame` | Assess single frame risk | `{ image: <b64|dataURL> }` | `{ score, indicators, timestamp }` |
+| `POST /api/detect_frame` | Bounding boxes | `{ image, prompt? }` | `{ boxes:[{box_2d,label}], size:[w,h] }` |
+| `POST /api/capture_and_save` | Store frame + optional annotate | `{ image, prompt?, run_detection?, save_to_gallery?, metadata? }` | `{ original, annotated? }` |
+| `POST /api/upload_and_analyze` | Upload file + risk | multipart `image` | `{ score, indicators, filename }` |
+| `POST /upload` | (Form) batch upload + optional annotate | form-data `images[]` | Redirect + flash |
+| `POST /delete` | Delete uploaded + annotated pair | form `name` | Redirect + flash |
 
-- **`POST /api/capture_and_save`** - Save frame and run detection  uv sync
+All APIs (except `/login`) require auth if credentials are configured.
 
-- **`POST /upload`** - Batch upload images for analysis```
+---
 
-   Or with pip:
+## 🧪 Risk Scoring Logic
+Prompt instructs the model to output strictly:
+```json
+{ "score": <0..1>, "indicators": ["short", "keywords"] }
+```
+Soft‑fails: if parsing fails or model unavailable ⇒ `{ score: 0, indicators: [] }`.
 
-### File Structure```
+---
 
-```pip install -e .
+## 🔁 Retry / Throttle Strategy
+- `_generate_with_retry` backs off exponentially (up to 4 retries) for `503`, `500`, `UNAVAILABLE`, or "overloaded" responses.
+- Frontend prevents overlapping in‑flight detection per client.
 
-├── app.py              # Main Flask application```
+---
 
-├── detector.py         # AI detection module3. Set your Google API key (NEVER hardcode):
+## 🔐 Optional Authentication
+Enabled when both `APP_USERNAME` and `APP_PASSWORD` are set. All primary routes then require a session login. Logout clears `session['auth']`.
 
-├── sender.py          # WebSocket camera server```
+---
 
-├── static/# PowerShell
+## 🛡 Security Notes
+- Not production hardened (no rate limiting, CSRF protection, or MIME type verification).
+- Only extension filtering for uploads – add server‑side MIME / size validation before production exposure.
+- Never store real sensitive or private camera feeds without consent & encryption.
+- Replace `SECRET_KEY` in `app.py` for any deployment.
 
-│   ├── scan.js        # Live detection frontendenv:GOOGLE_API_KEY="YOUR_KEY_HERE"
+---
 
-│   └── style.css      # Dark mode styling```
+## 🧭 Roadmap Ideas
+- Drag & drop multi‑upload UI
+- Persistent configuration (thresholds, intervals) per user
+- Async worker queue for heavy annotation
+- Model selection dropdown / multi‑prompt presets
+- Better gallery filtering & search
+- MIME type + size enforcement
 
-├── templates/
+---
 
-│   ├── scan.html      # Live detection page## Run
+## 🧪 Development Tips
+- Use smaller frame intervals cautiously (cost & rate limits).
+- Run `sender.py` separately to test multi‑subscriber frame distribution.
+- Add logging around `_generate_with_retry` to tune latency vs reliability.
 
-│   ├── index.html     # Gallery page```
+---
 
-│   ├── layout.html    # Base templatepython app.py
+## 📦 Minimal Dependency List
+See `requirements.txt` / `pyproject.toml`:
+`flask`, `flask-socketio`, `pillow`, `google-genai`, `supervision`, `python-dotenv` (optional).
 
-│   └── login.html     # Authentication```
+---
 
-├── uploads/           # Uploaded imagesVisit http://127.0.0.1:5000
-
-└── annotated/         # AI-processed images
-
-```### Realtime Camera Mode
-
-1. Navigate to the Camera tab (nav link at top).
-
-## 🛡️ How It Works2. Allow browser camera permission.
-
-3. Optionally edit the prompt.
-
-1. **WebSocket Stream**: `sender.py` captures camera frames and broadcasts via WebSocket4. Click Start to begin periodic detection (default interval 1800 ms). Click Stop to pause.
-
-2. **Auto-Detection**: Homepage connects to WebSocket and analyzes frames every 5 seconds5. Bounding boxes and labels render on the canvas overlay; no frames are stored server-side.
-
-3. **AI Analysis**: Each frame sent to Google Gemini with specialized suicidal detection prompt
-
-4. **Real-time Alerts**: Audio beep + visual indicators when risk threshold exceededAdjust interval lower for faster refresh (higher API usage / cost). With WebSockets the server still throttles to one in-flight detection per client.
-
-5. **Continuous Monitoring**: Runs indefinitely until manually stopped
-
-### WebSocket vs HTTP Fallback
-
-## 🔒 Security NotesThe client attempts to establish a Socket.IO connection. If successful, each returned detection immediately triggers the next frame send, maximizing throughput without overlapping inference. If WebSocket fails, the page falls back to timed HTTP POST requests.
-
-
-
-- Set authentication credentials for production use### Authentication (Optional)
-
-- Validates file extensions only (consider MIME type checking for production)Set environment variables to enable login:
-
-- Internal prompts designed specifically for suicidal behavior detection```
-
-- No frames stored on server during live monitoringAPP_USERNAME=admin
-
-APP_PASSWORD=secret
-
-## 📝 License```
-
-MITIf unset, the site is open (no auth). When enabled, all main routes require login. Logout link appears in nav.
-
-### Deleting Images
-Authenticated users get a Delete button per image card that removes original and matching annotated file (if present).
-
-### Environment Variables Summary
-| Name | Purpose |
-|------|---------|
-| GOOGLE_API_KEY | Gemini API key (required for detection) |
-| MODEL_NAME | Override model id (optional) |
-| APP_USERNAME | Enable auth username (optional) |
-| APP_PASSWORD | Enable auth password (optional) |
-
-### Overload / Retry Handling
-The detection layer implements exponential backoff (up to 4 retries) for transient 503 / UNAVAILABLE / overloaded errors from the model API. Upload page flash messages distinguish overload from other failures. Adjust retry parameters in `detector.py` (`_generate_with_retry`).
-
-### Running with SocketIO
-When using `socketio.run(app)` development server is fine for local tests. For production consider `gunicorn -k eventlet -w 1 app:app` (adjust for create_app signature) or a production ASGI stack.
-
-## Environment Variables
-- `GOOGLE_API_KEY` (required for detection)
-- `MODEL_NAME` (optional override, default gemini-2.5-flash-preview-05-20)
-
-## File Storage
-Uploaded images stored under `uploads/`.
-Annotated images stored under `annotated/` with same stem + `_annotated` suffix.
-
-## Security Notes
-- This demo does not implement authentication. Do not expose publicly without adding auth and validation.
-- Validates file extensions only (basic). Consider MIME type checking for production.
-
-## Roadmap / Ideas
-- Multi-prompt selection
-- Async background processing
-- Drag & drop upload
-- Delete images button
-
-## License
+## ⚖️ License
 MIT
 
-### Realtime Stream (External WebSocket)
+---
 
-An additional "Realtime" navigation link has been added which allows the browser to subscribe to a raw camera stream served by `sender.py` (stand‑alone websockets server, port 8765).
+## 🙏 Acknowledgements
+- Google Gemini for multimodal inference.
+- Roboflow Supervision (`supervision`) for annotation utilities.
 
-To try it:
+---
 
-1. In a separate terminal start the frame publisher:
-   ```bash
-   python sender.py
-   ```
-2. (Optional) Start one or more receivers with `python reciver.py` to view via OpenCV.
-3. With the Flask app running, click the "Realtime" link in the top navigation.
-4. Click Connect – you should see live frames (base64 JPEG) updating. Open multiple tabs to test multi‑subscriber broadcasting.
+## ❗ Responsible Use Reminder
+This repository exists for experimentation with multimodal model integration. Always involve qualified professionals for real mental health assessment. Provide clear user warnings and obtain appropriate consent when capturing or analyzing images.
 
-If the page does not connect, ensure nothing else is using port 8765 and that `sender.py` printed "Server started at ws://localhost:8765".
+---
 
-### 5-Second Risk Scan Page
+### Quick Start (Copy/Paste)
+```powershell
+# Clone & enter
+git clone <your-repo-url>
+cd ZeroShotSucideDetection
 
-Use the new "5s Scan" nav link for a rapid assessment:
+# Install (uv)
+uv sync
 
-1. **Auto-start**: The page automatically starts the camera and begins detection 2 seconds after loading.
-2. **Continuous monitoring**: Captures frames every 5 seconds and sends each to `/api/risk_frame` with an internal suicidal detection prompt.
-3. **Real-time logging**: Each frame's risk score and indicators are logged with timestamps in the panel.
-4. **Immediate alerts**: If any frame crosses the threshold (default 0.5) OR any indicators appear, a short beep sounds immediately and the video border flashes red.
-5. **Visual feedback**: Status updates show camera access, detection progress, and any risk alerts.
+# Env vars
+$env:GOOGLE_API_KEY="YOUR_KEY"
 
-You can adjust the threshold as needed. The page uses an internal prompt specifically designed to detect suicidal signs - no user input required. This page does not save frames.
+# Run
+python app.py
+
+# (Optional) External publisher
+python sender.py
+```
+
+Open http://127.0.0.1:5000 and observe live risk logs.
+
+---
+
+Feel free to submit improvements or open issues for bugs / enhancement ideas.
+
