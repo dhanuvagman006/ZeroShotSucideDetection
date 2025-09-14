@@ -3,3 +3,4 @@ pillow
 google-genai
 supervision
 python-dotenv
+flask-socketio

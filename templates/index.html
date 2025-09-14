@@ -2,6 +2,9 @@
 {% block content %}
 <section class="upload">
   <h2>Upload Images</h2>
+  <div style="margin:.25rem 0 .75rem">
+    <a href="{{ url_for('realtime') }}" class="btn-link" role="button">Go to Realtime Stream</a>
+  </div>
   <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
     <input type="file" name="images" multiple accept="image/*" required>
     <label><input type="checkbox" name="run_detection" checked> Run detection</label>
@@ -28,6 +31,10 @@
           {% endif %}
         </div>
         <div class="filename">{{ img.original }}</div>
+        <form method="post" action="{{ url_for('delete_image') }}" onsubmit="return confirm('Delete this image (and annotated)?');">
+          <input type="hidden" name="name" value="{{ img.original }}" />
+          <button type="submit" class="delete-btn">Delete</button>
+        </form>
       </div>
     {% endfor %}
   </div>

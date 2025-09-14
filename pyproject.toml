@@ -10,6 +10,7 @@ dependencies = [
   "pillow",
   "google-genai",
   "supervision",
+  "flask-socketio",
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,16 @@
+{% extends 'layout.html' %}
+{% block content %}
+<h2>External Realtime Stream</h2>
+<p>This page subscribes to the raw camera frames published by <code>sender.py</code> over a standalone WebSocket server (ws://localhost:8765). Run <code>python sender.py</code> in another terminal first. Optionally open multiple browser tabs to view the broadcast.</p>
+<div class="realtime-wrapper">
+  <img id="rtFrame" alt="realtime frame" style="max-width:100%;border:1px solid #444" />
+</div>
+<pre id="rtStatus" class="status"></pre>
+<div class="controls" style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+  <button id="rtConnect">Start WebSocket</button>
+  <button id="rtDisconnect" class="hidden" disabled>Stop WebSocket</button>
+  <button id="rtStartDisplay" class="hidden" disabled>Start Display</button>
+  <button id="rtStopDisplay" class="hidden" disabled>Stop Display</button>
+</div>
+<script src="{{ url_for('static', filename='realtime.js') }}"></script>
+{% endblock %}

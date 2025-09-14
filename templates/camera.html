@@ -1,0 +1,19 @@
+{% extends 'layout.html' %}
+{% block content %}
+<h2>Realtime Camera Detection</h2>
+<p>Allow camera access, then click Start. Frames are sampled and sent to the model; boxes are drawn locally.</p>
+<form id="settings" class="camera-controls" onsubmit="return false;">
+  <label>Prompt: <input type="text" id="prompt" value="Detect objects." size="40" /></label>
+  <label>Interval (ms): <input type="number" id="interval" value="1800" min="500" step="100" style="width:80px" /></label>
+  <button id="startBtn">Start</button>
+  <button id="stopBtn" disabled>Stop</button>
+</form>
+<div class="camera-wrapper">
+  <video id="video" autoplay playsinline></video>
+  <canvas id="overlay"></canvas>
+</div>
+<pre id="status" class="status"></pre>
+<!-- Socket.IO client from CDN (v4) -->
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js" integrity="sha384-7bVYtU1Wyd4InENcy+XUG6uHgnIY7M1bRnbV0wOYAV/QXpVZlMaqkOawxjUY8jvB" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='camera.js') }}"></script>
+{% endblock %}
