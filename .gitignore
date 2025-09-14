@@ -1,3 +1,4 @@
 /.venv
 /gallery
 /__pycache__
+/templates
