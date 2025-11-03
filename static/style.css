@@ -94,8 +94,6 @@ button:disabled {
   transform: none;
   box-shadow: none;
 }
-
-/* Start/Stop Button Specific Styling */
 .start-btn {
   background: linear-gradient(135deg, #00ff88, #00cc70) !important;
   margin-right: 1rem;
@@ -238,8 +236,6 @@ label {
     grid-template-columns: 1fr 1fr;
   } 
 }
-
-/* Gallery Styles */
 .gallery-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -348,8 +344,6 @@ label {
   border: 1px solid rgba(255, 0, 0, 0.3);
   color: #ff4444;
 }
-
-/* Analysis Result */
 .analysis-result {
   background: #222;
   border: 1px solid #444;
@@ -425,8 +419,6 @@ label {
   border: 2px solid #00ff00;
   color: #00ff88;
 }
-
-/* Gallery Section */
 .gallery-section h2 {
   color: #00ff88;
   margin-bottom: 2rem;
@@ -528,8 +520,6 @@ label {
   border-radius: 4px;
   font-size: 0.8rem;
 }
-
-/* Empty Gallery */
 .empty-gallery {
   text-align: center;
   padding: 4rem 2rem;
@@ -545,8 +535,6 @@ label {
   color: #888;
   margin-bottom: 1rem;
 }
-
-/* Image Modal */
 .image-modal {
   position: fixed;
   top: 0;
@@ -587,8 +575,6 @@ label {
   align-items: center;
   justify-content: center;
 }
-
-/* Responsive Design */
 @media (max-width: 768px) {
   .result-content {
     grid-template-columns: 1fr;

@@ -1,9 +1,4 @@
-"""Detection module using Google Gemini + supervision to annotate images.
 
-Environment variables:
-  GOOGLE_API_KEY - required
-  MODEL_NAME - optional override (default gemini-2.5-flash-preview-05-20)
-"""
 from __future__ import annotations
 import os
 from pathlib import Path
@@ -30,7 +25,6 @@ PROMPT_SUFFIX = (
     ' and the text label in the key "label". Use descriptive labels.'
 )
 
-# Risk assessment prompt template (neutral wording, JSON contract enforced)
 RISK_PROMPT = (
     "You are a safety pattern screening assistant. Given an image, you will output a JSON object ONLY. "
     "The JSON must have keys: score (float 0-1), indicators (array of short lowercase strings). "
@@ -40,7 +34,7 @@ RISK_PROMPT = (
 
 
 def _get_client() -> genai.Client:
-    api_key = os.getenv('GOOGLE_API_KEY')
+    api_key = ''
     if not api_key:
         raise RuntimeError('GOOGLE_API_KEY not set')
     return genai.Client(api_key=api_key)
@@ -75,10 +69,6 @@ def _generate_with_retry(client, *, model, contents, config, max_retries=4, base
 
 
 def run_detection(image_path: str, output_dir: str, prompt: Optional[str] = None) -> str:
-    """Run detection and save annotated image.
-
-    Returns path to annotated image.
-    """
     prompt = (prompt or 'Detect objects.') + PROMPT_SUFFIX
 
     image = Image.open(image_path)
@@ -131,7 +121,6 @@ def run_detection(image_path: str, output_dir: str, prompt: Optional[str] = None
 
 
 def detect_boxes(image_bytes: bytes, prompt: Optional[str] = None):
-    """Accept raw image bytes, run detection, return list of {box_2d:[x1,y1,x2,y2], label:str}."""
     from io import BytesIO
     image = Image.open(BytesIO(image_bytes)).convert('RGB')
     print(f"[detect_boxes] image size: {image.size}, prompt: {prompt}")
@@ -167,11 +156,6 @@ def detect_boxes(image_bytes: bytes, prompt: Optional[str] = None):
 
 
 def assess_risk(image_bytes: bytes) -> dict:
-    """Assess potential safety / self-harm related visual risk in the image.
-
-    Returns dict { 'score': float 0..1, 'indicators': [str], 'raw': optional_raw_text }
-    Fails soft (returns score 0) if model unavailable or JSON parse fails.
-    """
     from io import BytesIO
     image = Image.open(BytesIO(image_bytes)).convert('RGB')
     width, height = image.size

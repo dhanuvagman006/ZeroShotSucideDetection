@@ -99,13 +99,19 @@ Then open: http://127.0.0.1:5000/
 ### Option B: External WebSocket camera publisher
 **Terminal 1 (frame broadcaster):**
 ```bash
-python sender.py
+python sender.py --camera 0 --fps 10
 ```
 **Terminal 2 (web app):**
 ```bash
 python app.py
 ```
 The live page subscribes to `ws://localhost:8765` and renders streamed frames.
+
+### Option C: Easy startup script
+Use the provided startup script to run both components:
+```bash
+python start_system.py
+```
 
 ---
 
@@ -147,7 +153,52 @@ All APIs (except `/login`) require auth if configured.
 
 ---
 
-## 🔁 Retry & Throttle Strategy
+## � Video Frame Sender (`sender.py`)
+
+The `sender.py` script captures video frames from a camera and broadcasts them via WebSocket to connected clients.
+
+### Features:
+- **Multi-camera support** – Automatic camera detection and selection
+- **Configurable FPS** – Control frame rate (default: 10 FPS)
+- **Multi-client support** – Multiple browser tabs can connect simultaneously
+- **Graceful shutdown** – Handles Ctrl+C and cleanup properly
+- **Statistics logging** – Frame count and performance metrics
+- **Auto-reconnection** – Clients reconnect automatically if sender restarts
+
+### Usage:
+```bash
+# Basic usage (camera 0, 10 FPS)
+python sender.py
+
+# Custom camera and FPS
+python sender.py --camera 1 --fps 15
+
+# Custom host and port
+python sender.py --host 0.0.0.0 --port 9000
+
+# List available cameras
+python sender.py --list-cameras
+
+# Environment variables
+CAMERA_INDEX=1 SENDER_FPS=15 python sender.py
+```
+
+### Command Line Options:
+- `--camera, -c`: Camera index (default: 0)
+- `--host`: WebSocket host (default: localhost)
+- `--port, -p`: WebSocket port (default: 8765)
+- `--fps, -f`: Frames per second (default: 10)
+- `--list-cameras`: Show available cameras and exit
+
+### Environment Variables:
+- `CAMERA_INDEX`: Default camera index
+- `SENDER_HOST`: Default WebSocket host
+- `SENDER_PORT`: Default WebSocket port  
+- `SENDER_FPS`: Default frames per second
+
+---
+
+## �🔁 Retry & Throttle Strategy
 
 - `_generate_with_retry` uses exponential backoff for transient 5xx / overload errors.
 - Frontend prevents overlapping in-flight requests per client.

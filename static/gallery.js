@@ -1,5 +1,3 @@
-// gallery.js - Gallery functionality for risk-detected frames and custom photo upload
-
 const fileInput = document.getElementById('customImage');
 const analyzeBtn = document.getElementById('analyzeBtn');
 const uploadStatus = document.getElementById('uploadStatus');
@@ -8,14 +6,10 @@ const analyzedImage = document.getElementById('analyzedImage');
 const riskScore = document.getElementById('riskScore');
 const riskIndicators = document.getElementById('riskIndicators');
 const riskStatus = document.getElementById('riskStatus');
-
-// Enable analyze button when file is selected
 fileInput.addEventListener('change', () => {
   analyzeBtn.disabled = !fileInput.files.length;
   hideAnalysisResult();
 });
-
-// Analyze uploaded image
 analyzeBtn.addEventListener('click', async () => {
   const file = fileInput.files[0];
   if (!file) return;
@@ -39,11 +33,8 @@ analyzeBtn.addEventListener('click', async () => {
       return;
     }
     
-    // Show analysis result
     showAnalysisResult(result, file);
     setUploadStatus('✅ Analysis complete!', 'success');
-    
-    // Auto refresh page after 3 seconds if risk was detected and saved to gallery
     if (result.score >= 0.5 || (result.indicators && result.indicators.length > 0)) {
       setTimeout(() => {
         window.location.reload();
@@ -63,14 +54,12 @@ function setUploadStatus(message, type) {
 }
 
 function showAnalysisResult(result, file) {
-  // Display uploaded image
   const reader = new FileReader();
   reader.onload = (e) => {
     analyzedImage.src = e.target.result;
   };
   reader.readAsDataURL(file);
   
-  // Display analysis results
   const score = result.score || 0;
   const indicators = result.indicators || [];
   
@@ -84,7 +73,6 @@ function showAnalysisResult(result, file) {
     riskIndicators.textContent = 'None detected';
   }
   
-  // Set risk status
   if (score >= 0.5 || indicators.length > 0) {
     riskStatus.textContent = '🚨 HIGH RISK';
     riskStatus.className = 'status-badge risk-high';
@@ -103,8 +91,6 @@ function showAnalysisResult(result, file) {
 function hideAnalysisResult() {
   analysisResult.style.display = 'none';
 }
-
-// Add click handler for gallery images to show full size
 document.addEventListener('click', (e) => {
   if (e.target.classList.contains('gallery-image')) {
     showImageModal(e.target.src);
@@ -112,7 +98,6 @@ document.addEventListener('click', (e) => {
 });
 
 function showImageModal(imageSrc) {
-  // Create modal overlay
   const modal = document.createElement('div');
   modal.className = 'image-modal';
   modal.innerHTML = `
@@ -124,14 +109,12 @@ function showImageModal(imageSrc) {
   
   document.body.appendChild(modal);
   
-  // Close modal when clicking overlay or close button
   modal.addEventListener('click', (e) => {
     if (e.target === modal || e.target.classList.contains('close-modal')) {
       document.body.removeChild(modal);
     }
   });
   
-  // Close modal with Escape key
   document.addEventListener('keydown', function escapeHandler(e) {
     if (e.key === 'Escape') {
       if (document.body.contains(modal)) {
@@ -141,10 +124,7 @@ function showImageModal(imageSrc) {
     }
   });
 }
-
-// Auto-refresh gallery every 30 seconds to show new risk-detected frames
 setInterval(() => {
-  // Only refresh if no analysis is in progress
   if (!analyzeBtn.disabled && !analysisResult.style.display !== 'none') {
     window.location.reload();
   }

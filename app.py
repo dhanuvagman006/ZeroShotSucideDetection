@@ -5,11 +5,9 @@ from flask_socketio import SocketIO
 import base64
 from werkzeug.utils import secure_filename
 
-# Lazy import detection module when needed to avoid requiring API key on startup
-
 def create_app():
     app = Flask(__name__)
-    app.config['SECRET_KEY'] = 'dev-secret'  # replace for production
+    app.config['SECRET_KEY'] = 'dev-secret'
     socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
     app.config['UPLOAD_FOLDER'] = str(Path('uploads'))
     app.config['ANNOTATED_FOLDER'] = str(Path('annotated'))
@@ -23,7 +21,6 @@ def create_app():
     def allowed_file(filename: str) -> bool:
         return Path(filename).suffix.lower() in app.config['ALLOWED_EXTENSIONS']
 
-    # --- Auth helpers ---
     def auth_enabled():
         return bool(os.getenv('APP_USERNAME') and os.getenv('APP_PASSWORD'))
 
@@ -42,20 +39,16 @@ def create_app():
     @app.route('/')
     @require_auth
     def index():
-        """Main page - now shows the realtime suicidal detection instead of gallery."""
         return render_template('scan.html', auth_enabled=auth_enabled(), logged_in=logged_in())
     
     @app.route('/gallery')
     @require_auth
     def gallery():
-        """Gallery page showing risk-detected frames and upload functionality."""
-        # Get risk-detected frames from gallery folder
         risk_images = []
         gallery_path = Path(app.config['GALLERY_FOLDER'])
         for img_path in sorted(gallery_path.glob('*'), key=lambda x: x.stat().st_mtime, reverse=True):
             if img_path.suffix.lower() not in app.config['ALLOWED_EXTENSIONS']:
                 continue
-            # Read metadata if exists
             metadata_path = img_path.with_suffix('.json')
             metadata = {}
             if metadata_path.exists():
@@ -160,7 +153,7 @@ def create_app():
             if not b64:
                 return {'error': 'image missing'}, 400
             import base64, traceback
-            header, _, encoded = b64.partition(',')  # data URL or raw
+            header, _, encoded = b64.partition(',')
             try:
                 raw = base64.b64decode(encoded or b64)
             except Exception as e:
@@ -181,10 +174,6 @@ def create_app():
     @app.route('/api/risk_frame', methods=['POST'])
     @require_auth
     def api_risk_frame():
-        """Return risk assessment score + indicators for a single frame.
-
-        Body: { image: <dataURL or b64> }
-        """
         try:
             data = request.get_json(force=True)
             if not data:
@@ -208,11 +197,6 @@ def create_app():
     @app.route('/api/capture_and_save', methods=['POST'])
     @require_auth
     def api_capture_and_save():
-        """Accept a single base64 frame, save it to uploads or gallery, run detection, return filenames.
-
-        JSON body: { image: <dataURL or raw b64>, prompt?: str, run_detection?: bool, save_to_gallery?: bool, metadata?: {} }
-        Response: { original: filename, annotated: filename|None }
-        """
         try:
             data = request.get_json(force=True)
             if not data:
@@ -230,15 +214,12 @@ def create_app():
                 raw = base64.b64decode(encoded or b64)
             except Exception:
                 return {'error': 'invalid base64'}, 400
-            
-            # Choose a filename (timestamp based to avoid collisions)
+
             import time
             fname = f"frame_{int(time.time()*1000)}.jpg"
-            
-            # Save to gallery or uploads based on flag
+
             if save_to_gallery:
                 save_path = Path(app.config['GALLERY_FOLDER']) / fname
-                # Also save metadata
                 metadata_path = save_path.with_suffix('.json')
                 import json
                 with open(metadata_path, 'w') as f:
@@ -255,7 +236,7 @@ def create_app():
                     from detector import run_detection as do_detect
                     out_path = do_detect(str(save_path), app.config['ANNOTATED_FOLDER'], prompt=prompt)
                     annotated_name = Path(out_path).name
-                except Exception as e:  # don't fail whole request
+                except Exception as e:  
                     print('capture_and_save detection error:', e)
             return {'original': fname, 'annotated': annotated_name}
         except Exception as e:
@@ -275,8 +256,7 @@ def create_app():
                 
             if not allowed_file(file.filename):
                 return {'error': 'Invalid file type'}, 400
-            
-            # Save the uploaded file
+
             import time
             filename = secure_filename(file.filename)
             base_name = Path(filename).stem
@@ -286,20 +266,17 @@ def create_app():
             upload_path = Path(app.config['UPLOAD_FOLDER']) / timestamped_name
             file.save(upload_path)
             
-            # Analyze for risk
             with open(upload_path, 'rb') as f:
                 image_data = f.read()
             
             from detector import assess_risk
             result = assess_risk(image_data)
             
-            # If risk detected, save to gallery
             if result.get('score', 0) >= 0.5 or result.get('indicators', []):
                 gallery_path = Path(app.config['GALLERY_FOLDER']) / timestamped_name
                 import shutil
                 shutil.copy2(upload_path, gallery_path)
                 
-                # Save metadata
                 import json
                 from datetime import datetime, timezone
                 metadata = {
