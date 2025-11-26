@@ -11,6 +11,7 @@
 - **Risk Assessment API** – Returns normalized score (0–1) + textual indicators (if present).
 - **Gallery** – Stores risk flagged frames with JSON metadata (score, indicators, timestamp).
 - **Real-time Alerts** – Audio + visual flashing border when threshold exceeded or indicators detected.
+- **Email Notifications** – Optional SMTP alerts when suicide-risk detections cross your configured threshold.
 - **External WebSocket Camera Source** – `sender.py` publishes frames to all subscribers (multi-tab capable).
 - **Optional Authentication** – Enable by setting `APP_USERNAME` + `APP_PASSWORD`.
 - **Dark Mode UI** – Minimal, monitoring-friendly interface.
@@ -38,11 +39,37 @@
 | Name | Required | Description | Default |
 |------|----------|-------------|---------|
 | `GOOGLE_API_KEY` | Yes | Gemini API key | — |
-| `MODEL_NAME` | No | Override model ID | `gemini-2.5-flash-preview-05-20` |
+| `MODEL_NAME` | No | Override model ID | `gemini-2.0-flash` |
 | `APP_USERNAME` | No | Enables auth (username) | — |
 | `APP_PASSWORD` | No | Enables auth (password) | — |
+| `ALERT_EMAIL_TO` | No | Recipient for suicide-risk alerts (enables SMTP alerts when set) | — |
+| `ALERT_EMAIL_FROM` | No | From address for alert emails | `SMTP_USERNAME` or recipient |
+| `ALERT_RISK_THRESHOLD` | No | Score (0–1) that triggers an email (indicators always trigger) | `0.5` |
+| `SMTP_HOST` | When alerts enabled | SMTP server hostname | — |
+| `SMTP_PORT` | When alerts enabled | SMTP server port | `587` |
+| `SMTP_USERNAME` | When alerts enabled | SMTP auth username | — |
+| `SMTP_PASSWORD` | When alerts enabled | SMTP auth password | — |
+| `SMTP_USE_TLS` | No | Use STARTTLS before sending mail | `true` |
+| `SMTP_USE_SSL` | No | Use SMTPS (mutually exclusive with TLS) | `false` |
+| `ALERT_EMAIL_SUBJECT` | No | Custom email subject line | `Suicide risk detected (...)` |
+| `GENAI_MODEL_URL` | No | Override full Gemini REST endpoint if needed | auto-built from model |
 
 Auth is disabled if either credential is missing.
+
+### Email alerts quick start
+
+Set the SMTP + alert variables to have the backend automatically email you whenever a frame crosses the suicide-risk threshold:
+
+```powershell
+$env:ALERT_EMAIL_TO="alerts@example.com"
+$env:SMTP_HOST="smtp.gmail.com"
+$env:SMTP_PORT="587"
+$env:SMTP_USERNAME="alerts@example.com"
+$env:SMTP_PASSWORD="app-specific-password"
+$env:ALERT_RISK_THRESHOLD="0.55"  # optional
+```
+
+Use `SMTP_USE_SSL=1` for SMTPS servers; otherwise the app defaults to STARTTLS.
 
 ---
 

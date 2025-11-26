@@ -4,6 +4,11 @@ from flask import Flask, request, redirect, url_for, render_template, send_from_
 from flask_socketio import SocketIO
 import base64
 from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
+
+from alerting import notify_risk_detection
+
+load_dotenv()
 
 def create_app():
     app = Flask(__name__)
@@ -188,6 +193,17 @@ def create_app():
                 return {'error': 'invalid base64'}, 400
             from detector import assess_risk
             result = assess_risk(raw)
+            notify_risk_detection(
+                score=result.get('score', 0.0),
+                indicators=result.get('indicators'),
+                source='api_risk_frame',
+                image_bytes=raw,
+                filename='live-frame.jpg',
+                extra={
+                    'endpoint': '/api/risk_frame',
+                    'client_ip': request.remote_addr or 'unknown',
+                },
+            )
             from datetime import datetime, timezone
             result['timestamp'] = datetime.now(timezone.utc).isoformat()
             return result
@@ -271,8 +287,9 @@ def create_app():
             
             from detector import assess_risk
             result = assess_risk(image_data)
-            
-            if result.get('score', 0) >= 0.5 or result.get('indicators', []):
+
+            should_save = result.get('score', 0) >= 0.5 or bool(result.get('indicators', []))
+            if should_save:
                 gallery_path = Path(app.config['GALLERY_FOLDER']) / timestamped_name
                 import shutil
                 shutil.copy2(upload_path, gallery_path)
@@ -289,6 +306,19 @@ def create_app():
                 with open(metadata_path, 'w') as f:
                     json.dump(metadata, f, indent=2)
             
+            notify_risk_detection(
+                score=result.get('score', 0.0),
+                indicators=result.get('indicators'),
+                source='api_upload_and_analyze',
+                image_path=str(upload_path),
+                filename=timestamped_name,
+                extra={
+                    'endpoint': '/api/upload_and_analyze',
+                    'client_ip': request.remote_addr or 'unknown',
+                    'saved_to_gallery': str(bool(should_save)),
+                },
+            )
+
             result['filename'] = timestamped_name
             return result
             
